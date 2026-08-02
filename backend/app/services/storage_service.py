@@ -74,3 +74,38 @@ async def delete_file(bucket_id: str, object_path: str) -> None:
         )
         if resp.status_code not in (200, 202):
             raise StorageError(f"Gagal hapus: {resp.status_code} {resp.text}")
+
+
+async def list_files(
+    bucket_id: str, prefix: str = "", limit: int = 100
+) -> list[tuple[str, str | None]]:
+    """List semua file di bucket privat, dengan pagination.
+
+    Returns:
+        list[(name, updated_at)] — updated_at ISO8601 (None jika tidak ada
+        metadata waktu dari storage provider).
+    """
+    names: list[tuple[str, str | None]] = []
+    async with httpx.AsyncClient(timeout=60) as client:
+        offset = 0
+        while True:
+            resp = await client.post(
+                f"{STORAGE_BASE}/object/list/{bucket_id}",
+                headers=_HEADERS,
+                json={
+                    "prefix": prefix,
+                    "limit": limit,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                },
+            )
+            if resp.status_code != 200:
+                raise StorageError(f"Gagal list file: {resp.status_code} {resp.text}")
+            items = resp.json()
+            if not items:
+                break
+            names.extend((it["name"], it.get("updated_at")) for it in items)
+            if len(items) < limit:
+                break
+            offset += limit
+    return names

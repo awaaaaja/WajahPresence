@@ -118,10 +118,11 @@ def frame_mean_diffs(imgs: list[np.ndarray]) -> list[float]:
 def analyze_images(imgs: list[np.ndarray]) -> list[tuple[np.ndarray, list]]:
     """Deteksi wajah per frame SECARA PARALEL, memakai detektor tercepat.
 
-    - Frame selain tengah (dipakai utk presence + pose): detektor ringan
-      320px (deteksi saja) — ~3x lebih cepat dari 640px.
-    - Frame tengah (embedding dipakai utk matching): analyzer utama 640px
-      agar embedding konsisten dengan saat enrollment.
+    - Semua frame memakai detektor ringan 320px (deteksi saja) — ~8x lebih
+      cepat dari 640px (Sprint 5.2, NFR-1: 640px ~1.1 dtk vs 320px ~0.16 dtk).
+    - Frame tengah: embedding dihitung dari crop ter-align (norm_crop 112px)
+      via model recognition SAJA — konsisten dengan enrollment yang memakai
+      jalur yang sama (cosine vs jalur 640px ~0.97, diuji).
 
     onnxruntime session aman dipanggil dari banyak thread — kunci NFR-1.
     """
@@ -130,12 +131,13 @@ def analyze_images(imgs: list[np.ndarray]) -> list[tuple[np.ndarray, list]]:
         return [(img, main.get(img)) for img in imgs]
 
     fast = get_fast_detector()
-    main = get_face_analyzer()
+    rec = get_face_analyzer().models["recognition"]
 
     def detect(i: int, img: np.ndarray) -> tuple[np.ndarray, list]:
-        if i == MIDDLE_FRAME_INDEX:
-            return img, main.get(img)
-        return img, fast.get(img)
+        faces = fast.get(img)
+        if i == MIDDLE_FRAME_INDEX and faces:
+            faces[0].embedding = rec.get(img, faces[0])
+        return img, faces
 
     results: list = [None] * len(imgs)
     with ThreadPoolExecutor(max_workers=min(len(imgs), 3)) as pool:

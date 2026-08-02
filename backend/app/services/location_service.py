@@ -35,6 +35,9 @@ class LocationSignals:
     prev_lng: float | None = None
     ip_dist_m: float | None = None  # jarak GPS vs IP-geolocation
     prev_dist_m: float | None = None  # jarak GPS ke absen terakhir (teleport)
+    me_exists: bool = False  # gate: user JWT terdaftar di public.users
+    my_status: str | None = None  # gate: status_enrollment user JWT
+    failures: int = 0  # gate: rate-limit — gagal dalam window
 
 
 async def match_and_evaluate_location(
@@ -47,11 +50,11 @@ async def match_and_evaluate_location(
     embedding_str: str,
     max_hours: float | None = None,
 ) -> tuple[dict[str, Any] | None, LocationSignals]:
-    """Match pgvector + SEMUA sinyal lokasi dalam SATU query.
+    """Match pgvector + gate/rate-limit + SEMUA sinyal lokasi dalam SATU query.
 
     Penggabungan ini krusial utk NFR-1 (< 3 dtk): koneksi pooler Supabase
-    ~400-700 ms per roundtrip, jadi 3 query terpisah (matching, geofence,
-    teleport-prev) menjadi 3x lipat waktu kritis. Satu roundtrip total.
+    ~400-700 ms per roundtrip, jadi query terpisah (gate, matching, geofence,
+    teleport-prev) menjadi 4x lipat waktu kritis. Satu roundtrip total.
     """
     max_hours = max_hours if max_hours is not None else settings.teleport_max_interval_hours
     result = await conn.execute(
@@ -69,6 +72,11 @@ async def match_and_evaluate_location(
             ") "
             "select "
             "  match_row.u_id, match_row.u_nama, match_row.u_status, match_row.sim, "
+            "  exists(select 1 from public.users where id = :uid) as me_exists, "
+            "  (select status_enrollment from public.users where id = :uid) as my_status, "
+            "  (select count(*) from public.attendance_logs l "
+            "   where l.user_id = :uid and l.timestamp >= now() - make_interval(mins => :win) "
+            "   and l.status in ('rejected', 'suspicious')) as failures, "
             "  (select count(*) from public.locations) as total_locations, "
             "  exists(select 1 from public.locations l "
             "         where st_dwithin(l.geom, pt.g, l.radius_meter)) as inside, "
@@ -119,6 +127,7 @@ async def match_and_evaluate_location(
             "lng": lng,
             "emb": embedding_str,
             "uid": user_id,
+            "win": settings.rate_limit_window_minutes,
             "max_hours": max_hours,
             "ipglat": ip_geo_lat,
             "ipglng": ip_geo_lng,
@@ -142,6 +151,9 @@ async def match_and_evaluate_location(
         prev_lng=row["prev_lng"],
         ip_dist_m=float(row["ip_dist_m"]) if row["ip_dist_m"] is not None else None,
         prev_dist_m=float(row["prev_dist_m"]) if row["prev_dist_m"] is not None else None,
+        me_exists=bool(row["me_exists"]),
+        my_status=row["my_status"],
+        failures=int(row["failures"] or 0),
     )
     return match, signals
 

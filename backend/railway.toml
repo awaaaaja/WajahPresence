@@ -1,0 +1,8 @@
+# Railway deploy config (backend FastAPI)
+# Build via Dockerfile (apt libs untuk cv2 + pre-download model InsightFace).
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 900

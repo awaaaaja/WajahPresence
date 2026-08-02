@@ -17,7 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from app.core.config import settings
 from app.core.database import engine
-from app.services.storage_service import StorageError, upload_file
+from app.services.storage_service import (
+    StorageError,
+    delete_file,
+    list_files,
+    upload_file,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,3 +146,50 @@ async def log_success_background(
             )
     except Exception:  # noqa: BLE001 - jangan sampai request gagal krn log
         logger.exception("Gagal menulis log %s di background (user=%s)", status, user_id)
+
+
+async def cleanup_expired_evidence() -> dict[str, int]:
+    """Retention policy (NFR-5): hapus foto bukti absen yang lebih tua dari
+    `evidence_retention_days` hari dari bucket `attendance-evidence`.
+
+    Log baris TETAP tersimpan (audit), hanya objek foto yang dihapus —
+    sesuai PRD: "foto capture absensi disimpan maksimal 90 hari (dikonfigurasi)".
+    Dipanggil berkala oleh background task di main.py.
+
+    Returns:
+        dict {deleted, skipped, error} untuk log & test.
+    """
+    cutoff = datetime.now(timezone.utc).timestamp() - settings.evidence_retention_days * 86400
+    deleted = 0
+    skipped = 0
+    errors = 0
+    try:
+        files = await list_files(settings.storage_attendance_bucket)
+    except StorageError:
+        logger.exception("Retention: gagal list bucket %s", settings.storage_attendance_bucket)
+        return {"deleted": 0, "skipped": 0, "error": 1}
+
+    for name, updated_at in files:
+        try:
+            if updated_at is None:
+                # Tidak ada metadata waktu -> tidak bisa diputuskan, skip.
+                skipped += 1
+                continue
+            age_s = cutoff - _parse_ts(updated_at)
+            if age_s > 0:
+                await delete_file(settings.storage_attendance_bucket, name)
+                deleted += 1
+            else:
+                skipped += 1
+        except (StorageError, ValueError):
+            errors += 1
+            logger.exception("Retention: gagal proses file %s", name)
+    if deleted:
+        logger.info("Retention: hapus %d foto evidence > %d hari (skip %d, error %d)",
+                    deleted, settings.evidence_retention_days, skipped, errors)
+    return {"deleted": deleted, "skipped": skipped, "error": errors}
+
+
+def _parse_ts(value: str) -> float:
+    """ISO8601 dari storage API -> epoch (s). Format: 2026-07-01T08:00:00.000Z."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()

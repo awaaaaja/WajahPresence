@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "absensi"
+project_id = "wajahpresence"
 
 # Link ke project Supabase hosted (Prompt 0.2):
 # project ref: axylfxhgjeolpjrrnukn  (jalankan: supabase link --project-ref axylfxhgjeolpjrrnukn)

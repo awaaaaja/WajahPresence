@@ -78,6 +78,18 @@ async def _db_keepalive() -> None:
             logger.exception("Keepalive DB gagal (diabaikan)")
 
 
+async def _evidence_retention() -> None:
+    """Retention foto bukti absen (NFR-5): hapus foto > N hari, tiap interval."""
+    from app.services.log_service import cleanup_expired_evidence
+
+    while True:
+        try:
+            await cleanup_expired_evidence()
+        except Exception:  # noqa: BLE001 - jangan matikan task
+            logger.exception("Retention cleanup gagal (diabaikan, coba lagi nanti)")
+        await asyncio.sleep(settings.evidence_cleanup_interval_hours * 3600)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Bucket privat dibuat sekali saat startup (idempotent) — dipakai oleh
@@ -104,12 +116,21 @@ async def lifespan(_app: FastAPI):
         await _warm_db_pages()
     except Exception:  # noqa: BLE001 - jangan gagalkan startup
         logger.exception("Warmup halaman DB gagal (diabaikan)")
+    try:
+        from app.core.security import _fetch_jwks
+
+        await _fetch_jwks()
+        logger.info("JWKS hangat")
+    except Exception:  # noqa: BLE001 - jangan gagalkan startup
+        logger.exception("Warmup JWKS gagal (diabaikan)")
 
     keepalive = asyncio.create_task(_db_keepalive())
+    retention = asyncio.create_task(_evidence_retention())
     try:
         yield
     finally:
         keepalive.cancel()
+        retention.cancel()
         await engine.dispose()
 
 

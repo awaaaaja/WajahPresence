@@ -12,11 +12,12 @@ Alur baru (anti video replay):
 
 import base64
 import random
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.config import settings
+from app.core.security import get_current_user
 from app.schemas.face import (
     LivenessChallengeResponse,
     LivenessCheckRequest,
@@ -34,7 +35,9 @@ CHALLENGE_VERSION = "pose-v1"
 
 
 @router.get("/challenge", response_model=LivenessChallengeResponse)
-async def liveness_challenge() -> LivenessChallengeResponse:
+async def liveness_challenge(
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> LivenessChallengeResponse:
     """Buat challenge pose acak untuk window liveness berikutnya."""
     poses = random.sample(POSE_POOL, CHALLENGE_PHASES)
     return LivenessChallengeResponse(
@@ -43,7 +46,10 @@ async def liveness_challenge() -> LivenessChallengeResponse:
 
 
 @router.post("/check", response_model=LivenessCheckResponse)
-async def liveness_check(req: LivenessCheckRequest) -> LivenessCheckResponse:
+async def liveness_check(
+    req: LivenessCheckRequest,
+    _user: Annotated[dict[str, Any], Depends(get_current_user)],
+) -> LivenessCheckResponse:
     """Cross-check server-side: frame beda + ada wajah + urutan pose sesuai challenge."""
     try:
         frames = [base64.b64decode(f, validate=True) for f in req.frames]

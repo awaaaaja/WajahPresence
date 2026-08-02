@@ -22,7 +22,7 @@ from app.services.face_service import (
     extract_embedding,
 )
 
-TEST_DIR = pathlib.Path("/tmp/opencode/faces")
+TEST_DIR = pathlib.Path(__file__).resolve().parent / "loadtest" / "faces"
 
 
 def _read(path: str) -> bytes:

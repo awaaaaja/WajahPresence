@@ -2,28 +2,31 @@
 
 Urutan validasi (fail-fast — jangan matching jika liveness gagal):
 
-  1. Gate: user terdaftar & status 'approved'.
-  2. Rate limit: percobaan gagal > batas dalam window -> 429 (tanpa komputasi).
-  3. Liveness server-side: frame beda + wajah ada + urutan pose sesuai
-     challenge (anti foto statis & replay video).
-  4. Matching: embedding frame tengah vs SEMUA embedding via pgvector,
+  1. Liveness server-side: frame beda + wajah ada + urutan pose sesuai
+     challenge (anti foto statis & replay video). Frame statis ditolak dari
+     diff piksel MURAH, tanpa deteksi wajah.
+  2. Matching: embedding frame tengah vs SEMUA embedding via pgvector,
      cosine >= threshold (0.6, dari config).
-  5. Lokasi (Sprint 3, multi-signal — FR-2.3/2.4/2.5/2.6/2.7):
+  3. Gate + rate limit (Sprint 5.2): user terdaftar & status 'approved',
+     percobaan gagal > batas dalam window -> 429. Digabung ke query
+     matching (1 roundtrip DB, NFR-1).
+  4. Lokasi (Sprint 3, multi-signal — FR-2.3/2.4/2.5/2.6/2.7):
      a. Geofence PostGIS (ST_DWithin) — reject bila di luar radius.
         Aktif hanya bila ada lokasi terkonfigurasi; bila area aktif dan
         client tidak mengirim lokasi -> reject (tidak bisa diverifikasi).
-     b. IP geolocation lookup (paralel sejak gate) sebagai sinyal pembanding.
+     b. IP geolocation lookup (paralel sejak awal) sebagai sinyal pembanding.
      c. GPS accuracy tidak wajar ATAU selisih GPS-vs-IP besar -> status
         log 'suspicious' (absen TETAP diterima, FR-2.6 flag utk review admin).
      d. Teleport (FR-2.7): kecepatan antar-absen > batas -> REJECT.
-  6. Log SEMUA percobaan (FR-2.8) + foto bukti untuk kasus gagal/mencurigakan.
+  5. Log SEMUA percobaan (FR-2.8) + foto bukti untuk kasus gagal/mencurigakan.
 
 Performa (NFR-1, < 3 detik):
   - SATU koneksi DB untuk seluruh request (handshake pooler ~0.5-2 dtk).
-  - Gate/rate-limit query + lookup IP-geo berjalan PARALEL dengan liveness
-    CPU-bound (asyncio + thread), bukan berurutan.
+  - Gate/rate-limit + lookup IP-geo berjalan PARALEL dengan liveness
+    CPU-bound (asyncio + thread) — gate digabung ke query matching
+    (Sprint 5.2: 2 roundtrip -> 1, pooler ~400-700 ms per roundtrip).
   - Deteksi 3 frame dijalankan paralel (thread pool — onnxruntime aman
-    dipanggil konkuren).
+    dipanggil konkuren); ekstraksi embedding juga di thread pool.
   - Frame statis (foto/layar diam) ditolak dari diff piksel MURAH, tanpa
     deteksi wajah sama sekali.
 """
@@ -115,21 +118,6 @@ async def face_check(
     t_conn = time.perf_counter()
     async with engine.connect() as conn:
         step("connect", t_conn)
-        # Gate + rate limit berjalan paralel dengan liveness CPU-bound.
-        t = time.perf_counter()
-        gate_task = asyncio.create_task(
-            conn.execute(
-                text(
-                    "select u.nama, u.status_enrollment, "
-                    " (select count(*) from public.attendance_logs l "
-                    "  where l.user_id = u.id and l.timestamp >= now() - make_interval(mins => :win) "
-                    "  and l.status in ('rejected', 'suspicious')) as failures "
-                    "from public.users u where u.id = :uid"
-                ),
-                {"uid": user_id, "win": settings.rate_limit_window_minutes},
-            )
-        )
-
         # IP geolocation lookup (Sprint 3) — jaringan, berjalan paralel dengan
         # liveness/matching supaya tidak menambah critical path (NFR-1).
         geoip_task = asyncio.create_task(lookup_ip(ip, dict(request.headers)))
@@ -141,68 +129,6 @@ async def face_check(
 
         if not is_static:
             liveness_future = asyncio.to_thread(analyze_images, imgs)
-
-        row_result = await gate_task
-        step("gate+ratelimit", t)
-        row = row_result.mappings().first()
-
-        if row is None:
-            geoip_task.cancel()
-            if not is_static:
-                await liveness_future  # biarkan deteksi selesai (log bersih)
-            raise HTTPException(status_code=404, detail="User tidak terdaftar")
-        if row["status_enrollment"] != "approved":
-            geoip_task.cancel()
-            if not is_static:
-                await liveness_future
-            await log_attempt(
-                conn, user_id, "rejected",
-                rejection_reason=f"status_enrollment={row['status_enrollment']}",
-                ip_address=ip, user_agent=user_agent,
-            )
-            await conn.commit()
-            raise HTTPException(
-                status_code=403,
-                detail="Wajah belum disetujui admin — absen tidak diizinkan",
-            )
-
-        # --- Rate limit (sebelum komputasi mahal) ----------------------------
-        failures = int(row["failures"] or 0)
-        if failures >= settings.rate_limit_max_failures:
-            t2 = time.perf_counter()
-            first = await conn.execute(
-                text(
-                    "select timestamp from public.attendance_logs "
-                    "where user_id = :uid and timestamp >= now() - make_interval(mins => :win) "
-                    "and status in ('rejected', 'suspicious') "
-                    "order by timestamp asc limit 1"
-                ),
-                {"uid": user_id, "win": settings.rate_limit_window_minutes},
-            )
-            first_ts = first.scalar()
-            step("rate-limit detail", t2)
-            if first_ts is not None:
-                unblock = first_ts + timedelta(minutes=settings.rate_limit_block_minutes)
-                now = datetime.now(timezone.utc)
-                if unblock > now:
-                    retry = int((unblock - now).total_seconds() // 60) + 1
-                    geoip_task.cancel()
-                    if not is_static:
-                        await liveness_future
-                    await log_attempt(
-                        conn, user_id, "rejected",
-                        rejection_reason="blocked: terlalu banyak percobaan gagal",
-                        ip_address=ip, user_agent=user_agent,
-                    )
-                    await conn.commit()
-                    raise HTTPException(
-                        status_code=429,
-                        detail={
-                            "message": "Terlalu banyak percobaan yang gagal. "
-                            f"Coba lagi dalam {retry} menit.",
-                            "retry_after_minutes": retry,
-                        },
-                    )
 
         if is_static:
             geoip_task.cancel()
@@ -246,18 +172,19 @@ async def face_check(
                 detail={"message": "Pemeriksaan liveness gagal", "reasons": liveness.reasons},
             )
 
-        # --- Matching via pgvector -------------------------------------------
+        # --- Matching via pgvector + gate/rate-limit (SATU roundtrip DB) ------
         t_e = time.perf_counter()
         try:
-            embedding = embedding_of_face(analyzed[middle_idx][1][0])
+            embedding = await asyncio.to_thread(embedding_of_face, analyzed[middle_idx][1][0])
         except FaceError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         emb_str = embedding_to_string(embedding)
         step("embedding", t_e)
 
         t4 = time.perf_counter()
-        # Matching pgvector + SEMUA sinyal lokasi dalam SATU query (NFR-1:
-        # pooler ~400-700 ms per roundtrip — 3 query terpisah jadi 3x lipat).
+        # Matching pgvector + GATE + SEMUA sinyal lokasi dalam SATU query
+        # (NFR-1: pooler ~400-700 ms per roundtrip — query terpisah jadi Nx
+        # lipat). Gate/rate-limit hasil query ikut dicocokkan di sini.
         # geoip_task harus selesai dulu (ip distance ada di query gabungan).
         ip_geo = await geoip_task
         best, signals = await match_and_evaluate_location(
@@ -265,7 +192,58 @@ async def face_check(
             ip_geo.lat if ip_geo else None, ip_geo.lng if ip_geo else None,
             emb_str,
         )
-        step("match+location", t4)
+        step("match+gate+location", t4)
+
+        # --- Gate: user terdaftar & status approved (dari query gabungan) -----
+        if not signals.me_exists:
+            raise HTTPException(status_code=404, detail="User tidak terdaftar")
+        if signals.my_status != "approved":
+            await log_attempt(
+                conn, user_id, "rejected",
+                rejection_reason=f"status_enrollment={signals.my_status}",
+                ip_address=ip, user_agent=user_agent,
+            )
+            await conn.commit()
+            raise HTTPException(
+                status_code=403,
+                detail="Wajah belum disetujui admin — absen tidak diizinkan",
+            )
+
+        # --- Rate limit (sebelum log sukses) ----------------------------------
+        failures = int(signals.failures or 0)
+        if failures >= settings.rate_limit_max_failures:
+            t2 = time.perf_counter()
+            first = await conn.execute(
+                text(
+                    "select timestamp from public.attendance_logs "
+                    "where user_id = :uid and timestamp >= now() - make_interval(mins => :win) "
+                    "and status in ('rejected', 'suspicious') "
+                    "order by timestamp asc limit 1"
+                ),
+                {"uid": user_id, "win": settings.rate_limit_window_minutes},
+            )
+            first_ts = first.scalar()
+            step("rate-limit detail", t2)
+            if first_ts is not None:
+                unblock = first_ts + timedelta(minutes=settings.rate_limit_block_minutes)
+                now = datetime.now(timezone.utc)
+                if unblock > now:
+                    retry = int((unblock - now).total_seconds() // 60) + 1
+                    await log_attempt(
+                        conn, user_id, "rejected",
+                        rejection_reason="blocked: terlalu banyak percobaan gagal",
+                        ip_address=ip, user_agent=user_agent,
+                    )
+                    await conn.commit()
+                    raise HTTPException(
+                        status_code=429,
+                        detail={
+                            "message": "Terlalu banyak percobaan yang gagal. "
+                            f"Coba lagi dalam {retry} menit.",
+                            "retry_after_minutes": retry,
+                        },
+                    )
+
         t_match = time.perf_counter()
         sim = best["sim"] if best else 0.0
         match_ok = best is not None and sim >= settings.match_threshold
@@ -378,7 +356,7 @@ async def face_check(
     logger.info("Absen %s user=%s sim=%.3f dalam %.1f dtk", log_status, user_id, sim, elapsed)
     return AttendanceResponse(
         status="success",
-        nama=row["nama"],
+        nama=best["nama"],
         timestamp=ts,
         confidence=sim,
         message=(

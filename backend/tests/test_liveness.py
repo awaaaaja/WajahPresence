@@ -24,7 +24,7 @@ from app.services.liveness_service import (
     classify_pose,
 )
 
-TEST_DIR = pathlib.Path("/tmp/opencode/faces")
+TEST_DIR = pathlib.Path(__file__).resolve().parent / "loadtest" / "faces"
 
 
 def _read_b64(name: str) -> str:

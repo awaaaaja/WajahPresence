@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "absensi-backend"
+    app_name: str = "wajahpresence-backend"
     app_version: str = "0.1.0"
     debug: bool = False
     dev_mode: bool = False
@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     teleport_max_speed_kmh: float = 120.0
     # Hanya bandingkan absen terakhir dalam jendela ini (jam); lebih lama = riwayat baru.
     teleport_max_interval_hours: float = 24.0
+
+    # Retention policy (NFR-5): foto bukti absen dihapus otomatis setelah N hari.
+    evidence_retention_days: int = 90
+    # Interval task pembersihan retention (jam) — jalan sebagai background task.
+    evidence_cleanup_interval_hours: int = 24
 
 
 @lru_cache

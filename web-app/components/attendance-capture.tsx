@@ -5,7 +5,9 @@ import {
   FilesetResolver,
 } from "@mediapipe/tasks-vision";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Play, RotateCcw } from "lucide-react";
 
+import Button from "@/components/ui/button";
 import { backendFetch } from "@/utils/backend";
 
 const MEDIAPIPE_VERSION = "1.0.1";
@@ -377,8 +379,8 @@ export default function AttendanceCapture({ authToken, onResult }: Props) {
         />
         {status === "active" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <svg viewBox="0 0 100 75" className="h-full w-full opacity-70">
-              <ellipse cx="50" cy="40" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+            <svg viewBox="0 0 100 75" className="h-full w-full opacity-70" aria-hidden="true">
+              <ellipse cx="50" cy="40" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
             </svg>
             <p className="absolute bottom-3 left-0 right-0 px-4 text-center text-sm font-medium text-white drop-shadow">
               Hadapkan wajah ke kamera
@@ -394,11 +396,11 @@ export default function AttendanceCapture({ authToken, onResult }: Props) {
               {challenge!.map((p, i) => (
                 <span
                   key={i}
-                  className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                  className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
                     i < phaseIndex
-                      ? "bg-green-500 text-white"
+                      ? "bg-success text-white"
                       : i === phaseIndex
-                        ? "bg-blue-500 text-white"
+                        ? "bg-primary text-white"
                         : "bg-gray-700 text-gray-300"
                   }`}
                 >
@@ -430,36 +432,23 @@ export default function AttendanceCapture({ authToken, onResult }: Props) {
       <canvas ref={canvasRef} className="hidden" />
 
       {errorMessage && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMessage}</p>
+        <p role="alert" className="mt-3 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+          {errorMessage}
+        </p>
       )}
 
       <div className="mt-4">
         {status === "active" && (
-          <button
-            type="button"
-            onClick={start}
-            className="w-full rounded-lg bg-green-600 py-3 text-sm font-semibold text-white hover:bg-green-700"
-          >
+          <Button type="button" variant="accent" fullWidth onClick={start}>
+            <Play className="h-4 w-4" aria-hidden="true" />
             Mulai Verifikasi Absen
-          </button>
+          </Button>
         )}
-        {status === "success" && (
-          <button
-            type="button"
-            onClick={reset}
-            className="w-full rounded-lg border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Absen Lagi
-          </button>
-        )}
-        {status === "error" && (
-          <button
-            type="button"
-            onClick={reset}
-            className="w-full rounded-lg border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            Coba Lagi
-          </button>
+        {(status === "success" || status === "error") && (
+          <Button type="button" variant="outline" fullWidth onClick={reset}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            {status === "success" ? "Absen Lagi" : "Coba Lagi"}
+          </Button>
         )}
       </div>
     </div>

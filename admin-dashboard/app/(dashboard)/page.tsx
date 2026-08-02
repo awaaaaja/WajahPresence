@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { Users, UserCheck, CalendarCheck, ShieldAlert } from "lucide-react";
 
 import { backendFetch, LogPage, UserSummary } from "@/utils/backend";
 import { createClient } from "@/utils/supabase/server";
@@ -39,22 +40,54 @@ export default async function DashboardHomePage() {
   }
 
   const cards = [
-    { label: "Total User", value: totalUsers },
-    { label: "Registrasi Pending", value: pendingUsers },
-    { label: "Absensi Hari Ini", value: todayLogs },
-    { label: "Mencurigakan (review)", value: suspiciousTotal },
+    {
+      label: "Total User",
+      value: totalUsers,
+      icon: Users,
+      iconClass: "bg-primary-soft text-primary",
+    },
+    {
+      label: "Registrasi Pending",
+      value: pendingUsers,
+      icon: UserCheck,
+      iconClass: "bg-warning-soft text-warning",
+    },
+    {
+      label: "Absensi Hari Ini",
+      value: todayLogs,
+      icon: CalendarCheck,
+      iconClass: "bg-success-soft text-success",
+    },
+    {
+      label: "Mencurigakan (review)",
+      value: suspiciousTotal,
+      icon: ShieldAlert,
+      iconClass: "bg-destructive-soft text-destructive",
+    },
   ];
 
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold text-gray-900">Dashboard</h2>
-      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      <h2 className="mb-4 font-mono text-xl font-semibold text-foreground">Dashboard</h2>
+      {error && (
+        <p role="alert" className="mb-4 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
-          <div key={card.label} className="rounded-lg bg-white p-6 shadow">
-            <p className="text-sm text-gray-500">{card.label}</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900">
-              {card.value ?? "—"}
+        {cards.map(({ label, value, icon: Icon, iconClass }) => (
+          <div
+            key={label}
+            className="rounded-xl border border-border bg-surface p-5 shadow-sm transition-shadow duration-200 hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted">{label}</p>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconClass}`}>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+            </div>
+            <p className="mt-2 font-mono text-2xl font-bold text-foreground">
+              {value ?? "—"}
             </p>
           </div>
         ))}

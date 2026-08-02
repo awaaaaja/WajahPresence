@@ -212,6 +212,32 @@ Keterbatasan PRD §8 terverifikasi: fake-GPS tidak terdeteksi definitif di
 browser — sistem flag `suspicious` untuk review admin (A4/A6 sesuai ekspektasi).
 Unit test: 38 passed.
 
+### Sprint 5.5 — Upgrade UI/UX (skill UI/UX Pro Max)
+
+**Status — SELESAI.** Skill `ui-ux-pro-max` (MIT, nextlevelbuilder) diinstal
+global `~/.config/opencode/skills/ui-ux-pro-max` dan dipakai untuk generate
+design system + checklist a11y:
+
+- **Design system** (`design-system/wajahpresence/MASTER.md` + `wajahpresence-admin/`):
+  - web-app: **Soft UI Evolution** — primary `#2563EB`, accent `#F97316`,
+    bg `#F8FAFC`, fg `#1E293B`, font **Outfit** (self-host via `next/font/local`).
+  - admin: **Data-Dense Dashboard** — primary `#1E40AF`, accent `#D97706`,
+    fg `#1E3A8A`, font **Fira Sans + Fira Code** (self-host).
+- **Tokens**: CSS vars + `tailwind.config.ts` (colors/radius/shadow/fonts)
+  di kedua app; primitives `components/ui/{button,card,badge,modal,toast}`.
+- **Web-app**: halaman baru **Riwayat Absensi** (`/riwayat`, filter bulan +
+  pagination, via endpoint baru `GET /attendance/logs/mine`), hero home +
+  kartu aksi ikon Lucide, wizard registrasi/absensi pakai tokens, safe-area
+  PWA, `maximumScale` zoom-lock dihapus (WCAG 1.4.4).
+- **Admin**: sidebar ikon **Lucide** + active-state (`usePathname`), badge
+  status terpusat (`components/status-badge.tsx`, hapus `STATUS_STYLE`
+  duplikat di 4 file), `window.confirm/alert` diganti **Modal + Toast**
+  (re-enroll, hapus lokasi, review, export).
+- **A11y**: focus-visible ring 3px, kontras ≥4.5:1, touch target ≥44px,
+  `prefers-reduced-motion`, `cursor-pointer` global, tanpa emoji sebagai ikon.
+- **Verifikasi**: lint + `next build` kedua app OK; backend 38→39 unit test
+  passed (termasuk `GET /attendance/logs/mine` 401 tanpa token).
+
 ---
 
 ## Catatan Prioritas

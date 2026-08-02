@@ -5,6 +5,9 @@ import {
   FilesetResolver,
 } from "@mediapipe/tasks-vision";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, RotateCcw } from "lucide-react";
+
+import Button from "@/components/ui/button";
 
 const MEDIAPIPE_VERSION = "1.0.1";
 const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
@@ -392,21 +395,21 @@ export default function LivenessCapture({
         {/* Overlay panduan sudut (tahap siap) */}
         {status === "active" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <svg viewBox="0 0 100 75" className="h-full w-full opacity-70">
+            <svg viewBox="0 0 100 75" className="h-full w-full opacity-70" aria-hidden="true">
               {angle === "front" && (
-                <ellipse cx="50" cy="40" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <ellipse cx="50" cy="40" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
               )}
               {angle === "left" && (
-                <ellipse cx="38" cy="40" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <ellipse cx="38" cy="40" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
               )}
               {angle === "right" && (
-                <ellipse cx="62" cy="40" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <ellipse cx="62" cy="40" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
               )}
               {angle === "up" && (
-                <ellipse cx="50" cy="32" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <ellipse cx="50" cy="32" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
               )}
               {angle === "down" && (
-                <ellipse cx="50" cy="48" rx="22" ry="28" fill="none" stroke="#3b82f6" strokeWidth="2" />
+                <ellipse cx="50" cy="48" rx="22" ry="28" fill="none" stroke="#93c5fd" strokeWidth="2" />
               )}
             </svg>
             <p className="absolute bottom-3 left-0 right-0 px-4 text-center text-sm font-medium text-white drop-shadow">
@@ -424,11 +427,11 @@ export default function LivenessCapture({
               {challenge!.map((p, i) => (
                 <span
                   key={i}
-                  className={`rounded px-2 py-0.5 text-xs font-semibold ${
+                  className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
                     i < phaseIndex
-                      ? "bg-green-500 text-white"
+                      ? "bg-success text-white"
                       : i === phaseIndex
-                        ? "bg-blue-500 text-white"
+                        ? "bg-primary text-white"
                         : "bg-gray-700 text-gray-300"
                   }`}
                 >
@@ -461,27 +464,23 @@ export default function LivenessCapture({
       <canvas ref={canvasRef} className="hidden" />
 
       {errorMessage && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMessage}</p>
+        <p role="alert" className="mt-3 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+          {errorMessage}
+        </p>
       )}
 
       <div className="mt-4 flex gap-3">
         {status === "active" && (
-          <button
-            type="button"
-            onClick={runLiveness}
-            className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-          >
+          <Button type="button" fullWidth onClick={runLiveness}>
+            <Camera className="h-4 w-4" aria-hidden="true" />
             Ambil Sample ({angleLabel})
-          </button>
+          </Button>
         )}
         {status === "captured" && (
-          <button
-            type="button"
-            onClick={retake}
-            className="w-full rounded-lg border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
+          <Button type="button" variant="outline" fullWidth onClick={retake}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
             Ulangi
-          </button>
+          </Button>
         )}
       </div>
     </div>

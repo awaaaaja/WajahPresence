@@ -37,8 +37,8 @@ export default async function LocationsPage() {
 
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold text-gray-900">Locations</h2>
-      <p className="mb-4 text-sm text-gray-500">
+      <h2 className="mb-1 font-mono text-xl font-semibold text-foreground">Locations</h2>
+      <p className="mb-4 text-sm text-muted">
         Kelola lokasi geofence absensi (Sprint 3). Perubahan langsung berlaku
         untuk validasi absen berikutnya — tanpa restart service.
       </p>

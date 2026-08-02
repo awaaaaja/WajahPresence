@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowLeft, ScanFace } from "lucide-react";
 
+import Button from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 
 export default function LoginPage() {
@@ -43,31 +45,42 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-5">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-2xl font-bold text-gray-900">Absensi</h1>
-        <p className="mb-6 text-sm text-gray-500">
-          {mode === "login" ? "Masuk untuk absen" : "Buat akun baru"}
-        </p>
+  const inputClass =
+    "w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-base text-foreground transition-colors duration-200 focus:border-primary focus:outline-none focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-5 pb-safe">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-white shadow-md">
+            <ScanFace className="h-6 w-6" aria-hidden="true" />
+          </span>
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
+            <h1 className="text-2xl font-bold text-foreground">WajahPresence</h1>
+            <p className="text-sm text-muted">
+              {mode === "login" ? "Masuk untuk absen" : "Buat akun baru"}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <div>
+            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
               Email
             </label>
             <input
               id="email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+              className={inputClass}
               placeholder="nama@email.com"
             />
           </div>
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-foreground">
               Password
             </label>
             <input
@@ -75,37 +88,51 @@ export default function LoginPage() {
               type="password"
               required
               minLength={6}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none"
+              className={inputClass}
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {message && <p className="text-sm text-green-600">{message}</p>}
+          {error && (
+            <p role="alert" className="rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p role="status" className="rounded-lg bg-success-soft px-3 py-2 text-sm text-success">
+              {message}
+            </p>
+          )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? "Memproses..." : mode === "login" ? "Masuk" : "Daftar"}
-          </button>
+          <Button type="submit" fullWidth loading={loading}>
+            {loading
+              ? "Memproses..."
+              : mode === "login"
+                ? "Masuk"
+                : "Daftar"}
+          </Button>
         </form>
 
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          fullWidth
+          className="mt-3"
           onClick={() => {
             setMode(mode === "login" ? "signup" : "login");
             setError(null);
+            setMessage(null);
           }}
-          className="mt-4 w-full text-center text-sm text-blue-600"
         >
           {mode === "login" ? "Belum punya akun? Daftar" : "Sudah punya akun? Masuk"}
-        </button>
+        </Button>
+
         <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-gray-400">
-            ← Kembali ke beranda
+          <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Kembali ke beranda
           </Link>
         </div>
       </div>

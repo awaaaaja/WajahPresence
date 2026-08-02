@@ -2,16 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Check, X } from "lucide-react";
 
+import Button from "@/components/ui/button";
 import { backendFetch } from "@/utils/backend";
-
-const ANGLE_LABEL: Record<string, string> = {
-  front: "Depan",
-  left: "Kiri",
-  right: "Kanan",
-  up: "Atas",
-  down: "Bawah",
-};
 
 interface Props {
   userId: string;
@@ -54,9 +48,9 @@ export default function DecisionForm({ userId, status, token, samples }: Props) 
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-gray-900">Keputusan Admin</h3>
-      <p className="mt-1 text-xs text-gray-500">
+    <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-foreground">Keputusan Admin</h3>
+      <p className="mt-1 text-xs text-muted">
         Verifikasi foto sample ({samples.length}) sebelum menyetujui.
       </p>
 
@@ -65,31 +59,35 @@ export default function DecisionForm({ userId, status, token, samples }: Props) 
         onChange={(e) => setReason(e.target.value)}
         placeholder="Alasan penolakan (wajib jika menolak)"
         rows={2}
-        className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
       />
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
 
       <div className="mt-3 flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="success"
           disabled={busy}
           onClick={() => decide(true)}
-          className="flex-1 rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+          className="flex-1"
         >
+          <Check className="h-4 w-4" aria-hidden="true" />
           {busy ? "Menyimpan..." : "Approve"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="destructive"
           disabled={busy}
           onClick={() => decide(false)}
-          className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+          className="flex-1"
         >
+          <X className="h-4 w-4" aria-hidden="true" />
           {busy ? "Menyimpan..." : "Reject"}
-        </button>
+        </Button>
       </div>
-      <p className="mt-2 text-xs text-gray-400">
-        {ANGLE_LABEL["front"] && "Hanya user berstatus pending yang dapat diputuskan."}
+      <p className="mt-2 text-xs text-muted">
+        Hanya user berstatus pending yang dapat diputuskan.
       </p>
     </div>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { FileDown, FileSpreadsheet } from "lucide-react";
 
+import Button from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { BACKEND_URL } from "@/utils/backend";
 
 export default function ExportButton({
@@ -13,6 +16,7 @@ export default function ExportButton({
 }) {
   const [busy, setBusy] = useState<"xlsx" | "pdf" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   async function download(format: "xlsx" | "pdf") {
     if (!token) return;
@@ -43,6 +47,7 @@ export default function ExportButton({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      toast("Export " + format.toUpperCase() + " berhasil diunduh", "success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal export");
     } finally {
@@ -52,23 +57,29 @@ export default function ExportButton({
 
   return (
     <div className="flex items-center gap-2">
-      <button
+      <Button
         type="button"
+        variant="success"
+        size="sm"
+        loading={busy === "xlsx"}
+        disabled={busy !== null}
         onClick={() => download("xlsx")}
-        disabled={busy !== null}
-        className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
       >
-        {busy === "xlsx" ? "…" : "Export Excel"}
-      </button>
-      <button
+        <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
+        Export Excel
+      </Button>
+      <Button
         type="button"
-        onClick={() => download("pdf")}
+        variant="success"
+        size="sm"
+        loading={busy === "pdf"}
         disabled={busy !== null}
-        className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        onClick={() => download("pdf")}
       >
-        {busy === "pdf" ? "…" : "Export PDF"}
-      </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+        <FileDown className="h-4 w-4" aria-hidden="true" />
+        Export PDF
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
     </div>
   );
 }

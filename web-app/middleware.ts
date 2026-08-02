@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { createClient } from "@/utils/supabase/middleware";
 
-const PROTECTED_PREFIXES = ["/registrasi", "/absensi"];
+const PROTECTED_PREFIXES = ["/registrasi", "/absensi", "/riwayat"];
 
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse } = createClient(request);

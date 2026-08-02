@@ -1,17 +1,26 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  MapPin,
+  Clock3,
+  ShieldAlert,
+  Map,
+} from "lucide-react";
 
+import NavLink from "@/components/nav-link";
 import SignOutButton from "@/components/sign-out-button";
+import { ToastProvider } from "@/components/ui/toast";
 import { createClient } from "@/utils/supabase/server";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/users", label: "Users", icon: "👥" },
-  { href: "/locations", label: "Locations", icon: "📍" },
-  { href: "/attendance-logs", label: "Attendance Logs", icon: "🕒" },
-  { href: "/suspicious-attempts", label: "Suspicious Attempts", icon: "⚠️" },
-  { href: "/map", label: "Peta", icon: "🗺️" },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/users", label: "Users", icon: Users },
+  { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/attendance-logs", label: "Attendance Logs", icon: Clock3 },
+  { href: "/suspicious-attempts", label: "Suspicious Attempts", icon: ShieldAlert },
+  { href: "/map", label: "Peta", icon: Map },
 ];
 
 export default async function DashboardLayout({
@@ -40,21 +49,16 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex w-full flex-col gap-1 border-b border-gray-200 bg-white p-4 md:w-64 md:border-b-0 md:border-r">
+      <aside className="flex w-full flex-col gap-1 border-b border-border bg-surface p-4 md:w-64 md:border-b-0 md:border-r">
         <div className="mb-4">
-          <h1 className="text-lg font-bold text-gray-900">Absensi Admin</h1>
-          <p className="truncate text-xs text-gray-500">{user.email}</p>
+          <h1 className="font-mono text-lg font-bold text-foreground">
+            WajahPresence
+          </h1>
+          <p className="truncate text-xs text-muted">{user.email}</p>
         </div>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-1" aria-label="Navigasi utama">
           {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <span className="mr-2">{item.icon}</span>
-              {item.label}
-            </Link>
+            <NavLink key={item.href} {...item} />
           ))}
         </nav>
         <div className="mt-4 md:mt-auto">
@@ -62,7 +66,9 @@ export default async function DashboardLayout({
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-50 p-4 md:p-8">{children}</main>
+      <main className="flex-1 bg-background p-4 md:p-8">
+        <ToastProvider>{children}</ToastProvider>
+      </main>
     </div>
   );
 }

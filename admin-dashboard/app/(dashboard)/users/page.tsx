@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { Search } from "lucide-react";
 
 import ReEnrollButton from "@/components/re-enroll-button";
+import StatusBadge from "@/components/status-badge";
+import Button from "@/components/ui/button";
 import { backendFetch, UserSummary } from "@/utils/backend";
 import { createClient } from "@/utils/supabase/server";
-
-const STATUS_STYLE: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-700",
-  approved: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-700",
-  not_enrolled: "bg-gray-100 text-gray-500",
-};
 
 export default async function UsersPage({
   searchParams,
@@ -49,17 +45,18 @@ export default async function UsersPage({
 
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold text-gray-900">Users</h2>
+      <h2 className="mb-4 font-mono text-xl font-semibold text-foreground">Users</h2>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {filters.map((f) => (
           <Link
             key={f.label}
             href={f.key ? `/users?status=${f.key}${q ? `&q=${q}` : ""}` : `/users${q ? `?q=${q}` : ""}`}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
+            aria-current={(status ?? undefined) === f.key ? "page" : undefined}
+            className={`inline-flex min-h-[40px] items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
               (status ?? undefined) === f.key
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-600 hover:bg-gray-100"
+                ? "bg-primary text-white"
+                : "bg-surface text-muted hover:bg-gray-100"
             }`}
           >
             {f.label}
@@ -72,28 +69,28 @@ export default async function UsersPage({
             name="q"
             defaultValue={q ?? ""}
             placeholder="Cari nama / email…"
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
-          <button
-            type="submit"
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-          >
+          <Button type="submit" size="sm">
+            <Search className="h-4 w-4" aria-hidden="true" />
             Cari
-          </button>
+          </Button>
         </form>
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        <p role="alert" className="mb-4 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
       )}
 
       {users.length === 0 && !error && (
-        <p className="text-sm text-gray-500">Belum ada user.</p>
+        <p className="text-sm text-muted">Belum ada user.</p>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
+          <thead className="border-b border-border bg-gray-50 text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3">Nama</th>
               <th className="px-4 py-3">Email</th>
@@ -105,21 +102,15 @@ export default async function UsersPage({
           <tbody>
             {users.map((u) => (
               <tr key={u.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{u.nama}</td>
-                <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                <td className="px-4 py-3 font-medium text-foreground">{u.nama}</td>
+                <td className="px-4 py-3 text-muted">{u.email}</td>
                 <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      STATUS_STYLE[u.status_enrollment] ?? STATUS_STYLE.not_enrolled
-                    }`}
-                  >
-                    {u.status_enrollment}
-                  </span>
+                  <StatusBadge status={u.status_enrollment} />
                 </td>
-                <td className="px-4 py-3 text-gray-600">{u.sample_count}</td>
+                <td className="px-4 py-3 text-muted">{u.sample_count}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <Link href={`/users/${u.id}`} className="font-medium text-blue-600 hover:underline">
+                    <Link href={`/users/${u.id}`} className="font-medium text-primary hover:underline">
                       Detail
                     </Link>
                     <ReEnrollButton

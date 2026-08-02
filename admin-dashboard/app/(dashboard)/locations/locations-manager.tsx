@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LocateFixed, MapPinOff, Plus, Trash2, X } from "lucide-react";
 
+import Modal from "@/components/ui/modal";
+import Button from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/utils/supabase/client";
 
 type LocationRow = {
@@ -25,24 +29,20 @@ export default function LocationsManager({
   const [rows, setRows] = useState<LocationRow[]>(initial);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<LocationRow | null>(null);
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LocationRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [locStatus, setLocStatus] = useState<string | null>(null);
 
   const supabase = createClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     setRows(initial);
   }, [initial]);
 
-  const notify = (ok: boolean, text: string) => {
-    setMessage({ ok, text });
-    if (!ok) return;
-    setTimeout(() => setMessage(null), 3000);
-  };
-
   const useMyLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      notify(false, "Browser tidak mendukung Geolocation API");
+      toast("Browser tidak mendukung Geolocation API", "error");
       return;
     }
     setLocStatus("Mendapatkan lokasi...");
@@ -65,11 +65,11 @@ export default function LocationsManager({
     const lng = Number(form.lng);
     const radius = Number(form.radius_meter);
     if (!form.nama_site.trim() || !Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radius)) {
-      notify(false, "Isi nama, koordinat, dan radius dengan benar");
+      toast("Isi nama, koordinat, dan radius dengan benar", "error");
       return;
     }
     if (radius <= 0) {
-      notify(false, "Radius harus lebih dari 0 meter");
+      toast("Radius harus lebih dari 0 meter", "error");
       return;
     }
 
@@ -79,24 +79,27 @@ export default function LocationsManager({
       : await supabase.from("locations").insert(payload);
 
     if (error) {
-      notify(false, `Gagal menyimpan: ${error.message}`);
+      toast(`Gagal menyimpan: ${error.message}`, "error");
       return;
     }
     setEditing(null);
     setForm(emptyForm);
     await reload();
-    notify(true, editing ? "Lokasi diperbarui" : "Lokasi ditambahkan");
+    toast(editing ? "Lokasi diperbarui" : "Lokasi ditambahkan", "success");
   };
 
-  const remove = async (id: string) => {
-    if (!window.confirm("Hapus lokasi geofence ini?")) return;
-    const { error } = await supabase.from("locations").delete().eq("id", id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { error } = await supabase.from("locations").delete().eq("id", deleteTarget.id);
+    setDeleting(false);
     if (error) {
-      notify(false, `Gagal menghapus: ${error.message}`);
+      toast(`Gagal menghapus: ${error.message}`, "error");
       return;
     }
+    setDeleteTarget(null);
     await reload();
-    notify(true, "Lokasi dihapus");
+    toast("Lokasi dihapus", "success");
   };
 
   const reload = useCallback(async () => {
@@ -115,31 +118,22 @@ export default function LocationsManager({
       lng: String(row.lng),
       radius_meter: String(row.radius_meter),
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const input =
-    "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none";
+    "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
   return (
     <div>
-      {message && (
-        <p
-          className={`mb-4 rounded-lg px-3 py-2 text-sm ${
-            message.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
-
       {isAdmin && (
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">
+        <div className="mb-6 rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
             {editing ? `Edit: ${editing.nama_site}` : "Tambah lokasi geofence"}
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Nama site</label>
+              <label className="mb-1 block text-xs text-muted">Nama site</label>
               <input
                 className={input}
                 value={form.nama_site}
@@ -148,7 +142,7 @@ export default function LocationsManager({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Radius (meter)</label>
+              <label className="mb-1 block text-xs text-muted">Radius (meter)</label>
               <input
                 className={input}
                 type="number"
@@ -159,7 +153,7 @@ export default function LocationsManager({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Latitude</label>
+              <label className="mb-1 block text-xs text-muted">Latitude</label>
               <input
                 className={input}
                 type="number"
@@ -170,7 +164,7 @@ export default function LocationsManager({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-gray-500">Longitude</label>
+              <label className="mb-1 block text-xs text-muted">Longitude</label>
               <input
                 className={input}
                 type="number"
@@ -181,47 +175,46 @@ export default function LocationsManager({
               />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={useMyLocation}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={useMyLocation}>
+              <LocateFixed className="h-4 w-4" aria-hidden="true" />
               Pakai lokasi saya
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
+            </Button>
+            <Button type="button" size="sm" onClick={save}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
               {editing ? "Simpan perubahan" : "Tambah lokasi"}
-            </button>
+            </Button>
             {editing && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setEditing(null);
                   setForm(emptyForm);
                 }}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
               >
+                <X className="h-4 w-4" aria-hidden="true" />
                 Batal
-              </button>
+              </Button>
             )}
           </div>
-          {locStatus && <p className="mt-2 text-xs text-gray-500">{locStatus}</p>}
+          {locStatus && <p className="mt-2 text-xs text-muted">{locStatus}</p>}
         </div>
       )}
 
       {rows.length === 0 && (
-        <p className="text-sm text-gray-500">
-          Belum ada lokasi. Tambahkan lokasi agar geofence absensi aktif (Sprint 3).
-        </p>
+        <div className="flex flex-col items-center rounded-xl border border-border bg-surface py-10 text-center shadow-sm">
+          <MapPinOff className="h-10 w-10 text-gray-300" aria-hidden="true" />
+          <p className="mt-3 text-sm text-muted">
+            Belum ada lokasi. Tambahkan lokasi agar geofence absensi aktif.
+          </p>
+        </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
+          <thead className="border-b border-border bg-gray-50 text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3">Site</th>
               <th className="px-4 py-3">Latitude</th>
@@ -233,19 +226,25 @@ export default function LocationsManager({
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{r.nama_site}</td>
-                <td className="px-4 py-3 text-gray-600">{r.lat.toFixed(5)}</td>
-                <td className="px-4 py-3 text-gray-600">{r.lng.toFixed(5)}</td>
-                <td className="px-4 py-3 text-gray-600">{r.radius_meter} m</td>
+                <td className="px-4 py-3 font-medium text-foreground">{r.nama_site}</td>
+                <td className="px-4 py-3 font-mono text-muted">{r.lat.toFixed(5)}</td>
+                <td className="px-4 py-3 font-mono text-muted">{r.lng.toFixed(5)}</td>
+                <td className="px-4 py-3 text-muted">{r.radius_meter} m</td>
                 {isAdmin && (
                   <td className="px-4 py-3">
                     <button
+                      type="button"
                       onClick={() => startEdit(r)}
-                      className="mr-3 font-medium text-blue-600 hover:underline"
+                      className="mr-3 font-medium text-primary hover:underline"
                     >
                       Edit
                     </button>
-                    <button onClick={() => remove(r.id)} className="font-medium text-red-600 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(r)}
+                      className="inline-flex items-center gap-1 font-medium text-destructive hover:underline"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       Hapus
                     </button>
                   </td>
@@ -255,6 +254,27 @@ export default function LocationsManager({
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Hapus lokasi geofence"
+        description={
+          deleteTarget
+            ? `Yakin hapus "${deleteTarget.nama_site}"? Absen dari lokasi ini tidak akan terverifikasi lagi.`
+            : undefined
+        }
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Batal
+            </Button>
+            <Button variant="destructive" loading={deleting} onClick={confirmDelete}>
+              Hapus Lokasi
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

@@ -365,3 +365,108 @@ async def face_check(
             else "Absensi dicatat — lokasi mencurigakan, menunggu review admin"
         ),
     )
+
+
+class MyLogRow(BaseModel):
+    id: str
+    timestamp: str
+    status: str
+    location_name: str | None = None
+    confidence: float | None = None
+    reasons: list[str] = []
+
+
+class MyLogPage(BaseModel):
+    logs: list[MyLogRow]
+    total: int
+    page: int
+    page_size: int
+
+
+@router.get("/logs/mine", response_model=MyLogPage)
+async def my_attendance_logs(
+    month: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    user: Annotated[dict[str, Any], Depends(get_current_user)] = None,
+) -> MyLogPage:
+    """Riwayat absen user sendiri (FR-2.8 user view): filter bulan + pagination.
+
+    Hanya log milik user yang login — dijamin oleh filter user_id di query
+    (backend memakai service role, sehingga RLS tidak bisa diandalkan).
+    """
+    page = max(1, page)
+    page_size = min(50, max(1, page_size))
+    user_id = user["sub"]
+
+    month_start: str | None = None
+    month_end: str | None = None
+    if month:
+        try:
+            y, m = (int(x) for x in month.split("-"))
+            month_start = f"{y:04d}-{m:02d}-01"
+            if m == 12:
+                month_end = f"{y + 1:04d}-01-01"
+            else:
+                month_end = f"{y:04d}-{m + 1:02d}-01"
+        except ValueError:
+            month_start = None
+
+    clauses = ["al.user_id = :user_id"]
+    params: dict[str, object] = {"user_id": user_id}
+    if month_start and month_end:
+        clauses.append("al.timestamp >= cast(:month_start as timestamptz)")
+        clauses.append("al.timestamp < cast(:month_end as timestamptz)")
+        params["month_start"] = month_start
+        params["month_end"] = month_end
+    where = " and ".join(clauses)
+    offset = (page - 1) * page_size
+
+    site_select = (
+        "(select l.nama_site from public.locations l "
+        "where l.geom is not null and al.lat is not null and al.lng is not null "
+        "and st_dwithin(l.geom, "
+        "st_setsrid(st_makepoint(al.lng, al.lat), 4326)::geography, "
+        "l.radius_meter) "
+        "order by st_distance(l.geom, "
+        "st_setsrid(st_makepoint(al.lng, al.lat), 4326)::geography) "
+        "limit 1) as site"
+    )
+
+    async with engine.connect() as conn:
+        rows = await conn.execute(
+            text(
+                "select al.id::text, al.timestamp::text, al.status, "
+                "al.confidence_score, al.rejection_reason, "
+                + site_select + ", count(*) over () as total_count "
+                "from public.attendance_logs al "
+                "where " + where + " "
+                "order by al.timestamp desc "
+                "limit :limit offset :offset"
+            ),
+            {**params, "limit": page_size, "offset": offset},
+        )
+        mapped = rows.mappings().all()
+
+    total = int(mapped[0]["total_count"]) if mapped else 0
+    logs: list[MyLogRow] = []
+    for r in mapped:
+        reason_raw = r["rejection_reason"]
+        reasons: list[str] = []
+        if reason_raw:
+            reasons = [
+                p.strip()
+                for p in reason_raw.split(";")
+                if p.strip()
+            ]
+        logs.append(
+            MyLogRow(
+                id=r["id"],
+                timestamp=r["timestamp"],
+                status=r["status"],
+                location_name=r["site"],
+                confidence=r["confidence_score"],
+                reasons=reasons,
+            )
+        )
+    return MyLogPage(logs=logs, total=total, page=page, page_size=page_size)

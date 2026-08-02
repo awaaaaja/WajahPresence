@@ -41,32 +41,38 @@ export default async function SuspiciousAttemptsPage({
 
   return (
     <div>
-      <h2 className="mb-1 text-xl font-semibold text-gray-900">Suspicious Attempts</h2>
-      <p className="mb-4 text-sm text-gray-500">
+      <h2 className="mb-1 font-mono text-xl font-semibold text-foreground">Suspicious Attempts</h2>
+      <p className="mb-4 text-sm text-muted">
         Percobaan absen yang ter-flag mencurigakan (accuracy/IP mismatch) untuk direview manual.
       </p>
 
       <div className="mb-4 flex gap-2">
         <Link
           href="/suspicious-attempts"
-          className={`rounded-lg px-3 py-1.5 text-sm ${reviewed === "false" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+          aria-current={reviewed === "false" ? "page" : undefined}
+          className={`inline-flex min-h-[40px] items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+            reviewed === "false" ? "bg-primary text-white" : "bg-surface text-muted hover:bg-gray-100"
+          }`}
         >
           Belum direview
         </Link>
         <Link
           href="/suspicious-attempts?reviewed=true"
-          className={`rounded-lg px-3 py-1.5 text-sm ${reviewed === "true" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+          aria-current={reviewed === "true" ? "page" : undefined}
+          className={`inline-flex min-h-[40px] items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+            reviewed === "true" ? "bg-primary text-white" : "bg-surface text-muted hover:bg-gray-100"
+          }`}
         >
           Sudah direview
         </Link>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      {!session && <p className="text-sm text-gray-500">Login diperlukan.</p>}
+      {error && <p role="alert" className="mb-4 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">{error}</p>}
+      {!session && <p className="text-sm text-muted">Login diperlukan.</p>}
 
       {data && (
         <>
-          <p className="mb-2 text-sm text-gray-500">
+          <p className="mb-2 text-sm text-muted">
             {data.total} percobaan (hal. {page}/{totalPages})
           </p>
           <SuspiciousList
@@ -77,13 +83,19 @@ export default async function SuspiciousAttemptsPage({
           <div className="mt-4 flex items-center justify-between">
             <Link
               href={`/suspicious-attempts?${new URLSearchParams({ reviewed, page: String(Math.max(1, page - 1)) })}`}
-              className={`rounded-lg px-3 py-1.5 text-sm ${page <= 1 ? "pointer-events-none text-gray-300" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              aria-disabled={page <= 1}
+              className={`inline-flex min-h-[40px] items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                page <= 1 ? "pointer-events-none text-gray-300" : "bg-surface text-muted hover:bg-gray-100"
+              }`}
             >
               ← Sebelumnya
             </Link>
             <Link
               href={`/suspicious-attempts?${new URLSearchParams({ reviewed, page: String(page + 1) })}`}
-              className={`rounded-lg px-3 py-1.5 text-sm ${page >= totalPages ? "pointer-events-none text-gray-300" : "bg-white text-gray-600 hover:bg-gray-100"}`}
+              aria-disabled={page >= totalPages}
+              className={`inline-flex min-h-[40px] items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 ${
+                page >= totalPages ? "pointer-events-none text-gray-300" : "bg-surface text-muted hover:bg-gray-100"
+              }`}
             >
               Berikutnya →
             </Link>

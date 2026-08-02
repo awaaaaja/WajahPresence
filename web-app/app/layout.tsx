@@ -4,33 +4,29 @@ import "./globals.css";
 
 import PwaRegister from "@/components/pwa-register";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
+const outfit = localFont({
+  src: "./fonts/Outfit-Variable.woff2",
+  variable: "--font-outfit",
   weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Absensi",
+  title: "WajahPresence",
   description: "Sistem absensi face recognition + live location",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Absensi",
+    title: "WajahPresence",
   },
 };
 
-// Mobile-first: viewport standar + viewport-fit untuk safe-area PWA
+// Mobile-first: viewport standar + viewport-fit untuk safe-area PWA.
+// Zoom tidak dikunci (aksesibilitas WCAG 1.4.4).
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
   themeColor: "#2563eb",
 };
@@ -42,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${outfit.variable} antialiased`}>
         <PwaRegister />
         {children}
       </body>

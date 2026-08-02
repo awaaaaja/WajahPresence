@@ -1,10 +1,14 @@
 import { cookies } from "next/headers";
 
 import AttendanceMap from "@/components/attendance-map";
+import Button from "@/components/ui/button";
 import { backendFetch, LogPage } from "@/utils/backend";
 import { createClient } from "@/utils/supabase/server";
 
 const MAP_LIMIT = 2000;
+
+const inputClass =
+  "mt-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 export default async function MapPage({
   searchParams,
@@ -39,41 +43,41 @@ export default async function MapPage({
 
   return (
     <div>
-      <h2 className="mb-4 text-xl font-semibold text-gray-900">Peta Absensi</h2>
+      <h2 className="mb-4 font-mono text-xl font-semibold text-foreground">Peta Absensi</h2>
 
-      <form method="get" action="/map" className="mb-4 flex items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
-        <label className="flex flex-col text-xs text-gray-500">
+      <form method="get" action="/map" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <label className="flex flex-col text-xs text-muted">
           Dari
           <input
             type="date"
             name="start"
             defaultValue={start}
-            className="mt-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            className={inputClass}
           />
         </label>
-        <label className="flex flex-col text-xs text-gray-500">
+        <label className="flex flex-col text-xs text-muted">
           Sampai
           <input
             type="date"
             name="end"
             defaultValue={end}
-            className="mt-1 rounded-lg border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+            className={inputClass}
           />
         </label>
-        <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+        <Button type="submit" size="sm">
           Tampilkan
-        </button>
+        </Button>
       </form>
 
-      {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      {!session && <p className="text-sm text-gray-500">Login diperlukan.</p>}
+      {error && <p role="alert" className="mb-4 rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">{error}</p>}
+      {!session && <p className="text-sm text-muted">Login diperlukan.</p>}
 
       {data && (
         <>
-          <p className="mb-2 text-sm text-gray-500">
+          <p className="mb-2 text-sm text-muted">
             {data.total} titik lokasi absen (maks. {MAP_LIMIT} ditampilkan, marker dikelompokkan otomatis).
           </p>
-          <div className="overflow-hidden rounded-xl border border-gray-200">
+          <div className="overflow-hidden rounded-xl border border-border shadow-sm">
             <AttendanceMap items={data.items} />
           </div>
         </>

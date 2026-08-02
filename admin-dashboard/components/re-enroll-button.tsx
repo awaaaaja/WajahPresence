@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 
+import Modal from "@/components/ui/modal";
+import Button from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { BACKEND_URL, ReEnrollResult } from "@/utils/backend";
 
 export default function ReEnrollButton({
@@ -17,11 +21,12 @@ export default function ReEnrollButton({
   disabled: boolean;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleReEnroll() {
-    if (!window.confirm(`Hapus data wajah "${nama}" dan minta registrasi ulang?`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -34,9 +39,11 @@ export default function ReEnrollButton({
         throw new Error((data as { detail?: string }).detail ?? `Gagal (HTTP ${resp.status})`);
       }
       const result = data as ReEnrollResult;
-      window.alert(
+      toast(
         `Berhasil: ${result.deleted_embeddings} embedding & ${result.deleted_photos} foto dihapus. Status: ${result.status_enrollment}`,
+        "success",
       );
+      setConfirmOpen(false);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal re-enroll");
@@ -46,21 +53,48 @@ export default function ReEnrollButton({
   }
 
   return (
-    <span>
+    <>
       <button
         type="button"
-        onClick={handleReEnroll}
+        onClick={() => setConfirmOpen(true)}
         disabled={disabled || busy}
-        className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+        className={`inline-flex min-h-[40px] items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-200 ${
           disabled
             ? "cursor-not-allowed text-gray-300"
-            : "text-amber-700 hover:bg-amber-50"
+            : "text-warning hover:bg-warning-soft"
         }`}
         title={disabled ? "Belum ada data wajah" : "Hapus embedding lama untuk registrasi ulang"}
       >
-        {busy ? "…" : "Re-enroll"}
+        {busy ? (
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
+        Re-enroll
       </button>
-      {error && <span className="ml-1 text-xs text-red-600">{error}</span>}
-    </span>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => !busy && setConfirmOpen(false)}
+        title="Re-enroll user"
+        description={`Hapus data wajah "${nama}" dan minta registrasi ulang?`}
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} disabled={busy}>
+              Batal
+            </Button>
+            <Button variant="destructive" loading={busy} onClick={handleReEnroll}>
+              Hapus & Minta Ulang
+            </Button>
+          </>
+        }
+      >
+        {error && (
+          <p role="alert" className="rounded-lg bg-destructive-soft px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+      </Modal>
+    </>
   );
 }

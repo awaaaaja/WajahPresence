@@ -28,8 +28,8 @@ import numpy as np
 from app.services.face_service import (
     FaceError,
     decode_image,
+    detect_faces_fast,
     get_face_analyzer,
-    get_fast_detector,
 )
 
 logger = logging.getLogger(__name__)
@@ -130,11 +130,11 @@ def analyze_images(imgs: list[np.ndarray]) -> list[tuple[np.ndarray, list]]:
         main = get_face_analyzer()
         return [(img, main.get(img)) for img in imgs]
 
-    fast = get_fast_detector()
+    fast = detect_faces_fast
     rec = get_face_analyzer().models["recognition"]
 
     def detect(i: int, img: np.ndarray) -> tuple[np.ndarray, list]:
-        faces = fast.get(img)
+        faces = fast(img)
         if i == MIDDLE_FRAME_INDEX and faces:
             faces[0].embedding = rec.get(img, faces[0])
         return img, faces

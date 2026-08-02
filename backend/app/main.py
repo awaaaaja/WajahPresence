@@ -21,13 +21,11 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 
 def _warm_face_model() -> None:
     """Load + satu inference dummy agar request pertama tidak kena ONNX warmup."""
-    from app.services.face_service import get_face_analyzer, get_fast_detector
+    from app.services.face_service import get_face_analyzer
 
     analyzer = get_face_analyzer()
     analyzer.get(np.zeros((128, 128, 3), dtype=np.uint8))
-    fast = get_fast_detector()
-    fast.get(np.zeros((128, 128, 3), dtype=np.uint8))
-    logger.info("Face model + fast detector warm (inference OK)")
+    logger.info("Face model warm (inference OK)")
 
 
 async def _warm_db_pages() -> None:

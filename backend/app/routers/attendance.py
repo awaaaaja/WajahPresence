@@ -399,24 +399,25 @@ async def my_attendance_logs(
     page_size = min(50, max(1, page_size))
     user_id = user["sub"]
 
-    month_start: str | None = None
-    month_end: str | None = None
+    month_start: datetime | None = None
+    month_end: datetime | None = None
     if month:
         try:
             y, m = (int(x) for x in month.split("-"))
-            month_start = f"{y:04d}-{m:02d}-01"
-            if m == 12:
-                month_end = f"{y + 1:04d}-01-01"
-            else:
-                month_end = f"{y:04d}-{m + 1:02d}-01"
+            month_start = datetime(y, m, 1, tzinfo=timezone.utc)
+            month_end = (
+                datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+                if m == 12
+                else datetime(y, m + 1, 1, tzinfo=timezone.utc)
+            )
         except ValueError:
             month_start = None
 
     clauses = ["al.user_id = :user_id"]
     params: dict[str, object] = {"user_id": user_id}
     if month_start and month_end:
-        clauses.append("al.timestamp >= cast(:month_start as timestamptz)")
-        clauses.append("al.timestamp < cast(:month_end as timestamptz)")
+        clauses.append("al.timestamp >= :month_start")
+        clauses.append("al.timestamp < :month_end")
         params["month_start"] = month_start
         params["month_end"] = month_end
     where = " and ".join(clauses)

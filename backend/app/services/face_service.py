@@ -7,6 +7,7 @@ inisialisasi berat (~2-3 dtk). Inference CPU ~200-800 ms/gambar.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from functools import lru_cache
 from typing import Any
@@ -21,6 +22,11 @@ EMBEDDING_DIM = 512
 MODEL_NAME = "buffalo_l"
 DET_SIZE = (640, 640)
 
+FAST_DET_SIZE = (320, 320)
+
+# det_size single-analyzer di-switch antar thread (liveness memakai pool).
+_det_lock = threading.Lock()
+
 DEFAULT_MATCH_THRESHOLD = 0.6  # cosine similarity (FR-2.2, dikonfigurasi admin)
 
 
@@ -30,7 +36,12 @@ class FaceError(Exception):
 
 @lru_cache(maxsize=1)
 def get_face_analyzer() -> Any:
-    """Lazy singleton FaceAnalysis — load sekali per proses server."""
+    """Lazy singleton FaceAnalysis — load sekali per proses server.
+
+    SATU session ONNX untuk SEMUA jalur (640px & 320px) — tidak ada session
+    deteksi kedua, hemat memori signifikan (Sprint 5.6: instance Railway OOM
+    saat memuat fast detector terpisah).
+    """
     from insightface.app import FaceAnalysis
 
     logger.info("Loading InsightFace model '%s' (CPU)...", MODEL_NAME)
@@ -46,28 +57,23 @@ def get_face_analyzer() -> Any:
     return analyzer
 
 
-@lru_cache(maxsize=1)
-def get_fast_detector() -> Any:
-    """Detektor ringan (deteksi SAJA, 320px) untuk liveness.
+def detect_faces_fast(img: np.ndarray) -> list[Any]:
+    """Deteksi wajah cepat (320px) memakai analyzer tunggal.
 
-    Dipakai untuk SEMUA frame liveness: presence + pose (kps) tersedia dan
-    ~8x lebih cepat dari deteksi 640px (Sprint 5.2). Embedding frame tengah
-    dihitung dari crop ter-align via model recognition SAJA (bukan deteksi
-    640px) — jalur yang sama dengan enrollment, cosine vs 640px ~0.97.
+    Setara dengan fast detector lama (deteksi SAJA di 320px, ~8x lebih cepat
+    dari 640px) tapi tanpa session ONNX kedua: hanya meng-switch input_size
+    det_model sementara. Lock serial antar thread (liveness memakai pool);
+    embedding/recognition tetap dihitung manual oleh pemanggil.
     """
-    from insightface.app import FaceAnalysis
-
-    logger.info("Loading fast detector (detection only, 320px)...")
-    start = time.perf_counter()
-    analyzer = FaceAnalysis(
-        name=MODEL_NAME,
-        providers=["CPUExecutionProvider"],
-        allowed_modules=["detection"],
-    )
-    analyzer.prepare(ctx_id=-1, det_size=(320, 320))
-    elapsed = time.perf_counter() - start
-    logger.info("Fast detector siap dalam %.2f dtk", elapsed)
-    return analyzer
+    analyzer = get_face_analyzer()
+    det = analyzer.det_model
+    prev = tuple(det.input_size) if det.input_size is not None else None
+    with _det_lock:
+        det.input_size = FAST_DET_SIZE
+        try:
+            return analyzer.get(img)
+        finally:
+            det.input_size = prev
 
 
 def decode_image(image_bytes: bytes) -> np.ndarray:
@@ -97,10 +103,9 @@ def extract_embedding(image_bytes: bytes) -> np.ndarray:
     """
     img = decode_image(image_bytes)
     analyzer = get_face_analyzer()
-    detector = get_fast_detector()
 
     start = time.perf_counter()
-    faces = detector.get(img)
+    faces = detect_faces_fast(img)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
     if len(faces) == 0:

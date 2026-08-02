@@ -7,9 +7,8 @@ const PROTECTED_PREFIXES = ["/registrasi", "/absensi", "/riwayat"];
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse } = createClient(request);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
 
   const pathname = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
